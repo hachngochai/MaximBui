@@ -516,6 +516,46 @@
       ball(0.18, 0xffffff, side * 0.24, 0.05, 0.1, avatar);
     }
 
+
+    // Gold power-up aura envelopes the whole character for 4.5 seconds.
+    const auraLayer=new THREE.Group();avatar.add(auraLayer);
+    const auraMaterial=new THREE.MeshBasicMaterial({color:0xffdb68,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+    const auraShell=mesh(new THREE.SphereGeometry(1,28,20),auraMaterial,0,1.48,0,auraLayer);
+    auraShell.scale.set(.95,1.72,.82);
+    const auraRings=[.38,1.13,2.02].map((h,i)=>{
+      const ring=mesh(new THREE.TorusGeometry(.81+i*.09,.035,8,56),
+        new THREE.MeshBasicMaterial({color:i===1?0xffffff:0xffcf46,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}),0,h,0,auraLayer);
+      ring.rotation.x=Math.PI/2;return ring;
+    });
+    const auraGlow=new THREE.PointLight(0xffc851,0,7);auraGlow.position.set(0,1.55,0);avatar.add(auraGlow);
+    const auraSparkles=[];
+    for(let i=0;i<30;i++){
+      const p=mesh(new THREE.OctahedronGeometry(.045+(i%3)*.016),
+        new THREE.MeshBasicMaterial({color:i%3?0xffdd7b:0xffffff,transparent:true,opacity:0,depthWrite:false}),0,0,0,auraLayer);
+      auraSparkles.push({p,theta:2*Math.PI*i/30,height:.16+(i%10)*.26,radius:.67+(i%4)*.1});
+    }
+    let auraUntil=0;
+    function triggerAura(){
+      auraUntil=clocks.t+4.5;
+    }
+    function animateAura(){
+      const remaining=auraUntil-clocks.t;
+      const power=Math.max(0,Math.min(1,remaining*2, (4.5-remaining)*3));
+      auraShell.visible=power>0;
+      auraShell.material.opacity=.16*power*(.85+.15*Math.sin(clocks.t*8));
+      auraShell.scale.set(.95+power*.12,1.72+Math.sin(clocks.t*5)*.04,.82+power*.12);
+      auraRings.forEach((ring,i)=>{
+        ring.visible=power>0;ring.material.opacity=(.78-i*.12)*power;
+        ring.rotation.z+=.012*(i%2?1:-1);
+        ring.position.y=[.38,1.13,2.02][i]+Math.sin(clocks.t*2.5+i)*.1;
+      });
+      auraGlow.intensity=power*(3.8+Math.sin(clocks.t*9)*.6);
+      auraSparkles.forEach(({p,theta,height,radius},i)=>{
+        p.visible=power>0;p.material.opacity=power*(.65+.3*Math.sin(clocks.t*8+i));
+        const angle=theta+clocks.t*(.8+i%3*.15);
+        p.position.set(Math.cos(angle)*radius,height+.15*Math.sin(clocks.t*2+i),Math.sin(angle)*radius);
+      });
+    }
     const balloons = [];
     for (let i = 0; i < 18; i++) {
       const b = new THREE.Group();
@@ -797,7 +837,8 @@
       if(state.speechText !== '裴范煌明'){
         chineseRestore = {text:state.speechText,target:state.speechTarget};
       }
-      state.chineseNameUntil = clocks.t + 3.2;
+      state.chineseNameUntil = clocks.t + 4.5;
+      triggerAura();
       setSpeech('裴范煌明', avatar);
       avatar.rotation.y += .28;
       if(chineseTimer)clearTimeout(chineseTimer);
@@ -814,7 +855,7 @@
           setSpeech(chineseRestore.text,chineseRestore.target);
         }
         state.chineseNameUntil=0;
-      },3200);
+      },4500);
     }
     function handleInteraction(targetName = null) {
       ensureAudioContext();
@@ -911,6 +952,7 @@
       controls.update();
       island.rotation.y = state.phase === 'explore' ? Math.sin(clocks.t * 0.4) * 0.06 : island.rotation.y * 0.92;
       avatar.position.y = Math.sin(clocks.t * 2.1) * 0.06;
+      animateAura();
       if(helloArm)helloArm.rotation.z = state.chineseNameUntil>clocks.t ? .55+Math.sin(clocks.t*12)*.28 : .18;
       balloons.forEach(({ group, baseY, seed }) => { group.position.y = baseY + Math.sin(clocks.t + seed) * 0.15; });
       cakeHover.rotation.z += 0.02;
